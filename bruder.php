@@ -11,7 +11,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// --- 2. Koneksi Database & Ambil Data Bruder ---
+// --- 2. Koneksi Database & Ambil Data ---
 $conn = new mysqli('localhost', 'root', '', 'db_fic_bruderan');
 if ($conn->connect_error) {
     die("Koneksi gagal: " . $conn->connect_error);
@@ -22,17 +22,31 @@ $bruder_id = $_GET['id'] ?? 0;
 $nomor_bruder = '-';
 
 if ($bruder_id > 0) {
+    // Ambil Nama Bruder
     $stmt = $conn->prepare("SELECT id_bruder, nama_bruder FROM bruder WHERE id_bruder = ?");
     $stmt->bind_param("i", $bruder_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $bruder = $result->fetch_assoc();
+    $result_bruder_info = $stmt->get_result();
+    if ($result_bruder_info->num_rows > 0) {
+        $bruder = $result_bruder_info->fetch_assoc();
         $bruder_name = $bruder['nama_bruder'];
         $nomor_bruder = $bruder['id_bruder'];
     }
     $stmt->close();
+
+    // Ambil Data Perjalanan Bruder
+    $stmt_perjalanan = $conn->prepare(
+        "SELECT keterangan, tanggal_berangkat, tanggal_kembali, jumlah_hari
+         FROM perjalanan_bruder
+         WHERE id_bruder = ?
+         ORDER BY tanggal_berangkat DESC"
+    );
+    $stmt_perjalanan->bind_param("i", $bruder_id);
+    $stmt_perjalanan->execute();
+    $perjalanan = $stmt_perjalanan->get_result();
+    $stmt_perjalanan->close();
 }
+
 
 // --- 3. Logika Logout ---
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
@@ -49,17 +63,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bruder - <?php echo htmlspecialchars($bruder_name); ?></title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .sidebar-link.active { background-color: #F3F4F6; font-weight: 600; }
-        th, td { padding: 0.5rem 1rem; border: 1px solid #E5E7EB; }
+        th, td { padding: 0.75rem 1rem; border: 1px solid #E5E7EB; text-align: left; }
         th { background-color: #F9FAFB; }
     </style>
-    <!-- Load Google Font Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-[#002244]">
@@ -76,12 +86,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                 <a href="bank.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bank</a>
                 <a href="bruder.php?id=<?php echo $bruder_id; ?>" class="sidebar-link active flex items-center px-6 py-3 text-gray-800 transition">Bruder</a>
                 <a href="lu_komunitas.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">LU Komunitas</a>
-                <a href="evaluasi.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
+                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
                 <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
                 <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
             </nav>
             <div class="p-6 border-t">
-                 <a href="dashboard.php" class="w-full text-center mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition block">
+                 <a href="laporan.php" class="w-full text-center mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition block">
                     Kembali
                 </a>
                 <a href="bruder.php?action=logout" class="w-full text-center bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition block">
@@ -93,7 +103,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         <!-- Konten Utama -->
         <main class="flex-1 p-8">
             <div class="bg-white rounded-2xl shadow-lg p-8 h-full flex flex-col">
-                <!-- Header Informasi Bruder -->
+                <!-- Header -->
                 <div class="flex items-center space-x-4 border-b pb-4 mb-6">
                     <div>
                         <p class="text-lg font-semibold text-gray-500">No.</p>
@@ -106,46 +116,44 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                     </div>
                 </div>
 
-                <!-- Tabel Bruder -->
+                <!-- Tabel Riwayat Perjalanan -->
+                <h2 class="text-xl font-bold text-gray-700 mb-4">Riwayat Perjalanan & Penugasan</h2>
                 <div class="flex-grow overflow-y-auto">
-                    <table class="w-full text-center text-sm">
+                    <table class="w-full text-sm">
                         <thead class="sticky top-0 bg-white">
                             <tr>
-                                <th rowspan="2" class="align-bottom">No</th>
-                                <th rowspan="2" class="align-bottom">Nama</th>
-                                <th colspan="2">Tgl Penambahan</th>
-                                <th colspan="2">Tgl Pengurangan</th>
-                                <th rowspan="2" class="align-bottom">Jumlah</th>
-                                <th rowspan="2" class="align-bottom">Keterangan</th>
-                            </tr>
-                            <tr>
-                                <th>Datang</th>
-                                <th>Pergi</th>
-                                <th>Pergi</th>
-                                <th>Pulang</th>
+                                <th>No</th>
+                                <th>Keterangan</th>
+                                <th>Tanggal Berangkat</th>
+                                <th>Tanggal Kembali</th>
+                                <th class="text-center">Jumlah Hari</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php for ($i = 1; $i <= 16; $i++): ?>
-                            <tr>
-                                <td><?php echo $i; ?></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td>-</td>
-                                <td></td>
-                            </tr>
-                            <?php endfor; ?>
+                            <?php if (isset($perjalanan) && $perjalanan->num_rows > 0): ?>
+                                <?php $no = 1; ?>
+                                <?php while($row = $perjalanan->fetch_assoc()): ?>
+                                <tr>
+                                    <td class="text-center"><?php echo $no++; ?></td>
+                                    <td><?php echo htmlspecialchars($row['keterangan']); ?></td>
+                                    <td><?php echo htmlspecialchars(date('d F Y', strtotime($row['tanggal_berangkat']))); ?></td>
+                                    <td><?php echo htmlspecialchars(date('d F Y', strtotime($row['tanggal_kembali']))); ?></td>
+                                    <td class="text-center"><?php echo htmlspecialchars($row['jumlah_hari']); ?></td>
+                                </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="5" class="text-center py-10 text-gray-500">Belum ada riwayat perjalanan untuk bruder ini.</td>
+                                </tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
                 
-                <!-- Tombol Simpan -->
+                <!-- Tombol Aksi -->
                 <div class="pt-6 text-right border-t mt-auto">
                     <button class="bg-[#003366] text-white font-bold py-2 px-8 rounded-full hover:bg-[#004488] transition">
-                        Simpan
+                        Tambah Perjalanan
                     </button>
                 </div>
             </div>

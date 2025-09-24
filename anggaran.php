@@ -17,8 +17,16 @@ if ($conn->connect_error) {
     die("Koneksi gagal: " . $conn->connect_error);
 }
 
-$bruder_name = '...';
-$bruder_id = $_GET['id'] ?? 0;
+// Logika baru untuk mengambil ID Bruder yang lebih kuat
+$bruder_id = 0;
+if (isset($_GET['id']) && is_numeric($_GET['id'])) {
+    $bruder_id = (int)$_GET['id'];
+    $_SESSION['bruder_id_terpilih'] = $bruder_id;
+} elseif (isset($_SESSION['bruder_id_terpilih'])) {
+    $bruder_id = (int)$_SESSION['bruder_id_terpilih'];
+}
+
+$bruder_name = 'Pilih Bruder Dahulu';
 $nomor_bruder = '-';
 
 if ($bruder_id > 0) {
@@ -36,6 +44,8 @@ if ($bruder_id > 0) {
 
 // --- 3. Logika Logout ---
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    // Hapus ID bruder terpilih dari session saat logout
+    unset($_SESSION['bruder_id_terpilih']);
     $_SESSION = array();
     session_destroy();
     header("Location: login.php");
@@ -71,14 +81,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                 <a href="anggaran.php?id=<?php echo $bruder_id; ?>" class="sidebar-link active flex items-center px-6 py-3 text-gray-800 transition">Data</a>
                 <a href="kode_perkiraan.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kode Perkiraan</a>
                 <a href="kas_harian.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Harian</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bank</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bruder</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">LU Komunitas</a>
+                <a href="bank.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bank</a>
+                <a href="bruder.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bruder</a>
+                <a href="lu_komunitas.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">LU Komunitas</a>
                 <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
                 <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
                 <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
             </nav>
             <div class="p-6 border-t">
+                <a href="laporan.php" class="w-full text-center mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition block">
+                    Kembali
+                </a>
                 <a href="anggaran.php?action=logout" class="w-full text-center bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition">
                     Keluar
                 </a>
