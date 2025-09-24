@@ -1,9 +1,8 @@
 <?php
 // =====================================================================
-//            HALAMAN LU KOMUNITAS
+//            HALAMAN LU KOMUNITAS (FINAL - NAVIGASI DIPERBAIKI)
 // =====================================================================
 
-// --- 1. Memulai Sesi & Keamanan ---
 session_start();
 
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
@@ -11,25 +10,13 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// --- 2. Koneksi Database & Ambil Data ---
 $conn = new mysqli('localhost', 'root', '', 'db_fic_bruderan');
 if ($conn->connect_error) {
     die("Koneksi gagal: " . $conn->connect_error);
 }
 
-// Logika baru untuk mengambil ID Bruder yang lebih kuat
-// Prioritas: 1. Ambil dari URL (?id=..), 2. Ambil dari session.
-$bruder_id = 0;
-if (isset($_GET['id']) && is_numeric($_GET['id'])) {
-    $bruder_id = (int)$_GET['id'];
-    // Simpan ID yang baru dipilih ke dalam session untuk navigasi selanjutnya
-    $_SESSION['bruder_id_terpilih'] = $bruder_id;
-} elseif (isset($_SESSION['bruder_id_terpilih'])) {
-    // Jika tidak ada ID di URL, gunakan yang terakhir disimpan di session
-    $bruder_id = (int)$_SESSION['bruder_id_terpilih'];
-}
-
-
+// Logika yang benar untuk mengambil ID dari URL
+$bruder_id = (int)($_GET['id'] ?? 0);
 $bruder_name = 'Pilih Bruder Dahulu';
 $nomor_bruder = '-';
 
@@ -42,9 +29,9 @@ if ($bruder_id > 0) {
     $stmt = $conn->prepare("SELECT id_bruder, nama_bruder FROM bruder WHERE id_bruder = ?");
     $stmt->bind_param("i", $bruder_id);
     $stmt->execute();
-    $result_bruder_info = $stmt->get_result();
-    if ($result_bruder_info->num_rows > 0) {
-        $bruder = $result_bruder_info->fetch_assoc();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $bruder = $result->fetch_assoc();
         $bruder_name = $bruder['nama_bruder'];
         $nomor_bruder = $bruder['id_bruder'];
     }
@@ -75,8 +62,6 @@ if ($bruder_id > 0) {
     $stmt_lu->close();
 }
 
-
-// --- 3. Logika Logout ---
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = array();
     session_destroy();
@@ -114,9 +99,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                 <a href="bank.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bank</a>
                 <a href="bruder.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bruder</a>
                 <a href="lu_komunitas.php?id=<?php echo $bruder_id; ?>" class="sidebar-link active flex items-center px-6 py-3 text-gray-800 transition">LU Komunitas</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
+                <a href="evaluasi.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
+                <a href="buku_besar.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
+                <a href="kas_opname.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
             </nav>
             <div class="p-6 border-t">
                  <a href="laporan.php" class="w-full text-center mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition block">

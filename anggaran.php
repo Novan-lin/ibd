@@ -3,7 +3,6 @@
 //            HALAMAN DATA BRUDER (setelah pemilihan)
 // =====================================================================
 
-// --- 1. Memulai Sesi & Keamanan ---
 session_start();
 
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
@@ -11,21 +10,13 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// --- 2. Koneksi Database & Ambil Data Bruder ---
 $conn = new mysqli('localhost', 'root', '', 'db_fic_bruderan');
 if ($conn->connect_error) {
     die("Koneksi gagal: " . $conn->connect_error);
 }
 
-// Logika baru untuk mengambil ID Bruder yang lebih kuat
-$bruder_id = 0;
-if (isset($_GET['id']) && is_numeric($_GET['id'])) {
-    $bruder_id = (int)$_GET['id'];
-    $_SESSION['bruder_id_terpilih'] = $bruder_id;
-} elseif (isset($_SESSION['bruder_id_terpilih'])) {
-    $bruder_id = (int)$_SESSION['bruder_id_terpilih'];
-}
-
+// Logika yang benar untuk mengambil ID dari URL
+$bruder_id = (int)($_GET['id'] ?? 0);
 $bruder_name = 'Pilih Bruder Dahulu';
 $nomor_bruder = '-';
 
@@ -42,10 +33,7 @@ if ($bruder_id > 0) {
     $stmt->close();
 }
 
-// --- 3. Logika Logout ---
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
-    // Hapus ID bruder terpilih dari session saat logout
-    unset($_SESSION['bruder_id_terpilih']);
     $_SESSION = array();
     session_destroy();
     header("Location: login.php");
@@ -59,24 +47,20 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Data - <?php echo htmlspecialchars($bruder_name); ?></title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         .sidebar-link.active { background-color: #F3F4F6; font-weight: 600; }
     </style>
-    <!-- Load Google Font Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-[#002244]">
     <div class="flex h-screen">
-        <!-- Sidebar Baru -->
         <aside class="w-64 bg-white flex flex-col">
             <div class="p-6 text-center border-b">
                 <img src="https://placehold.co/100x100/003366/FFFFFF?text=FIC" alt="Logo FIC" class="w-20 h-20 mx-auto mb-2 rounded-full">
             </div>
+            <!-- NAVIGASI YANG SUDAH DIPERBAIKI -->
             <nav class="flex-grow pt-4">
                 <a href="anggaran.php?id=<?php echo $bruder_id; ?>" class="sidebar-link active flex items-center px-6 py-3 text-gray-800 transition">Data</a>
                 <a href="kode_perkiraan.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kode Perkiraan</a>
@@ -84,12 +68,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                 <a href="bank.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bank</a>
                 <a href="bruder.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bruder</a>
                 <a href="lu_komunitas.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">LU Komunitas</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
+                <a href="evaluasi.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
+                <a href="buku_besar.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
+                <a href="kas_opname.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
             </nav>
             <div class="p-6 border-t">
-                <a href="laporan.php" class="w-full text-center mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition block">
+                 <a href="laporan.php" class="w-full text-center mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition block">
                     Kembali
                 </a>
                 <a href="anggaran.php?action=logout" class="w-full text-center bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition">
@@ -101,7 +85,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         <!-- Konten Utama -->
         <main class="flex-1 p-8">
             <div class="bg-white rounded-2xl shadow-lg p-8 h-full flex flex-col">
-                <!-- Header Informasi Bruder -->
                 <div class="flex items-center space-x-4 border-b pb-4 mb-6">
                     <div>
                         <p class="text-lg font-semibold text-gray-500">No.</p>
@@ -113,8 +96,6 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                         <p class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($bruder_name); ?></p>
                     </div>
                 </div>
-
-                <!-- Konten Halaman Data -->
                 <div class="text-center text-gray-500 pt-10">
                     <h2 class="text-2xl font-semibold mb-2">Halaman Data Bruder</h2>
                     <p>Ini adalah halaman utama untuk Bruder <?php echo htmlspecialchars($bruder_name); ?>. Silakan pilih menu di samping untuk melanjutkan.</p>
@@ -124,3 +105,4 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     </div>
 </body>
 </html>
+

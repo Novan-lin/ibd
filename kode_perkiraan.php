@@ -1,9 +1,12 @@
 <?php
 // =====================================================================
-//            HALAMAN KODE PERKIRAAN
+//            HALAMAN KODE PERKIRAAN (VERSI DATA MANUAL)
+// =====================================================================
+// Versi ini tidak mengambil data dari database, melainkan langsung
+// menampilkannya dari array PHP. Ini lebih cepat dan sederhana
+// jika data kode perkiraan jarang sekali berubah.
 // =====================================================================
 
-// --- 1. Memulai Sesi & Keamanan ---
 session_start();
 
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
@@ -11,10 +14,73 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
     exit;
 }
 
-// Ambil ID Bruder dari URL untuk konsistensi link
-$bruder_id = $_GET['id'] ?? 0;
+// Logika yang benar untuk mengambil ID dari URL agar navigasi tetap berjalan
+$bruder_id = (int)($_GET['id'] ?? 0);
 
-// --- 2. Logika Logout ---
+// --- DATA KODE PERKIRAAN MANUAL ---
+$data_perkiraan = [
+    'PENERIMAAN' => [
+        ['pos' => 'A', 'kode_perkiraan' => '110100', 'nama_akun' => 'Kas'],
+        ['pos' => 'B', 'kode_perkiraan' => '110300', 'nama_akun' => 'Bank'],
+        ['pos' => 'C', 'kode_perkiraan' => '410101', 'nama_akun' => 'Gaji/Pendapatan Bruder'],
+        ['pos' => 'D', 'kode_perkiraan' => '410102', 'nama_akun' => 'Pensin Bruder'],
+        ['pos' => 'E', 'kode_perkiraan' => '430101', 'nama_akun' => 'Hasil Kebun dan Piaraan'],
+        ['pos' => 'F', 'kode_perkiraan' => '420101', 'nama_akun' => 'Bunga Tabungan'],
+        ['pos' => 'G', 'kode_perkiraan' => '410202', 'nama_akun' => 'Sumbangan'],
+        ['pos' => 'H', 'kode_perkiraan' => '430103', 'nama_akun' => 'Penerimaan Lainnya'],
+        ['pos' => 'I', 'kode_perkiraan' => '610100', 'nama_akun' => 'Penerimaan dari DP'],
+    ],
+    'PENGELUARAN' => [
+        ['pos' => '1', 'kode_perkiraan' => '510101', 'nama_akun' => 'Makanan'],
+        ['pos' => '2', 'kode_perkiraan' => '510201', 'nama_akun' => 'Pakaian dan Perlengkapan Pribadi'],
+        ['pos' => '3', 'kode_perkiraan' => '510301', 'nama_akun' => 'Pemeriksaan dan Pengobatan'],
+        ['pos' => '4', 'kode_perkiraan' => '510303', 'nama_akun' => 'Hiburan / Rekreasi'],
+        ['pos' => '5', 'kode_perkiraan' => '510501', 'nama_akun' => 'Transport Harian'],
+        ['pos' => '6', 'kode_perkiraan' => '520401', 'nama_akun' => 'Sewa Pribadi'],
+        ['pos' => '7', 'kode_perkiraan' => '510102', 'nama_akun' => 'Bahan Bakar Dapur'],
+        ['pos' => '8', 'kode_perkiraan' => '510103', 'nama_akun' => 'Perlengkapan Cuci dan Kebersihan'],
+        ['pos' => '9', 'kode_perkiraan' => '510104', 'nama_akun' => 'Perabot Rumah Tangga'],
+        ['pos' => '10', 'kode_perkiraan' => '510105', 'nama_akun' => 'Iuran Hidup Bermasyarakat dan Menggereja'],
+        ['pos' => '11', 'kode_perkiraan' => '510401', 'nama_akun' => 'Listrik'],
+        ['pos' => '12', 'kode_perkiraan' => '510402', 'nama_akun' => 'Air'],
+        ['pos' => '13', 'kode_perkiraan' => '510403', 'nama_akun' => 'Telepon dan Internet'],
+        ['pos' => '14', 'kode_perkiraan' => '520201', 'nama_akun' => 'Keperluan Ibadah'],
+        ['pos' => '15', 'kode_perkiraan' => '530302', 'nama_akun' => 'Sumbangan'],
+        ['pos' => '16', 'kode_perkiraan' => '540101', 'nama_akun' => 'Insentif ART'],
+        ['pos' => '17', 'kode_perkiraan' => '540201', 'nama_akun' => 'Pemeliharaan Rumah'],
+        ['pos' => '18', 'kode_perkiraan' => '540202', 'nama_akun' => 'Pemeliharaan Kebun dan Piaraan'],
+        ['pos' => '19', 'kode_perkiraan' => '540203', 'nama_akun' => 'Pemeliharaan Kendaraan'],
+        ['pos' => '20', 'kode_perkiraan' => '540204', 'nama_akun' => 'Pemeliharaan Mesin dan Peralatan'],
+        ['pos' => '21', 'kode_perkiraan' => '550101', 'nama_akun' => 'Administrasi Komunitas'],
+        ['pos' => '22', 'kode_perkiraan' => '550102', 'nama_akun' => 'Legal dan Perijinan'],
+        ['pos' => '23', 'kode_perkiraan' => '550106', 'nama_akun' => 'Buku, Majalah, Koran'],
+        ['pos' => '24', 'kode_perkiraan' => '550107', 'nama_akun' => 'Administrasi Bank'],
+        ['pos' => '25', 'kode_perkiraan' => '550201', 'nama_akun' => 'Pajak Bunga Bank'],
+        ['pos' => '26', 'kode_perkiraan' => '550202', 'nama_akun' => 'Pajak Kendaraan dan PBB'],
+        ['pos' => '27', 'kode_perkiraan' => '110202', 'nama_akun' => 'Kas Kecil DP'],
+        ['pos' => '28', 'kode_perkiraan' => '110201', 'nama_akun' => 'Kas Kecil Komunitas'],
+    ],
+    'LANSIA' => [
+        ['pos' => '29', 'kode_perkiraan' => '520501', 'nama_akun' => 'Penunjang Kesehatan Lansia'],
+        ['pos' => '30', 'kode_perkiraan' => '520502', 'nama_akun' => 'Pemeliharaan Rohani Lansia'],
+        ['pos' => '31', 'kode_perkiraan' => '520503', 'nama_akun' => 'Kegiatan Bruder Lansia'],
+    ],
+    'BUDGET KHUSUS' => [
+        ['pos' => '32', 'kode_perkiraan' => '130400', 'nama_akun' => 'Mesin dan Peralatan'],
+        ['pos' => '33', 'kode_perkiraan' => '510100', 'nama_akun' => 'Perabot Rumah Tangga'],
+        ['pos' => '34', 'kode_perkiraan' => '510502', 'nama_akun' => 'Transport Pertemuan'],
+        ['pos' => '35', 'kode_perkiraan' => '520300', 'nama_akun' => 'Perayaan Syukur'],
+        ['pos' => '36', 'kode_perkiraan' => '520400', 'nama_akun' => 'Kegiatan Lainnya'],
+        ['pos' => '37', 'kode_perkiraan' => '540200', 'nama_akun' => 'Pemeliharaan Rumah'],
+        ['pos' => '38', 'kode_perkiraan' => '550100', 'nama_akun' => 'Budget Khusus Lainnya'],
+    ],
+    'BIAYA DP' => [
+        ['pos' => '39', 'kode_perkiraan' => '510300', 'nama_akun' => 'Pemeriksaan dan Pengobatan'],
+        ['pos' => '40', 'kode_perkiraan' => '550300', 'nama_akun' => 'Pertemuan DP'],
+        ['pos' => '41', 'kode_perkiraan' => '530100', 'nama_akun' => 'Kegiatan Acc. DP'],
+    ]
+];
+
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = array();
     session_destroy();
@@ -29,47 +95,36 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kode Perkiraan - Aplikasi FIC</title>
-    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .sidebar-link.active {
-            background-color: #004488;
-            color: white;
-        }
-        tr:not(:last-child) {
-            border-bottom: 1px solid #E5E7EB;
-        }
-        th, td {
-            padding: 0.75rem 1rem;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-link.active { background-color: #F3F4F6; font-weight: 600; }
+        tr:not(:last-child) { border-bottom: 1px solid #E5E7EB; }
+        th, td { padding: 0.75rem 1rem; }
     </style>
-    <!-- Load Google Font Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body class="bg-[#002244]">
     <div class="flex h-screen">
-        <!-- Sidebar Baru -->
         <aside class="w-64 bg-white flex flex-col">
             <div class="p-6 text-center border-b">
                 <img src="https://placehold.co/100x100/003366/FFFFFF?text=FIC" alt="Logo FIC" class="w-20 h-20 mx-auto mb-2 rounded-full">
             </div>
             <nav class="flex-grow pt-4">
                 <a href="anggaran.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Data</a>
-                <a href="kode_perkiraan.php?id=<?php echo $bruder_id; ?>" class="sidebar-link active bg-gray-100 font-semibold flex items-center px-6 py-3 text-gray-800 transition">Kode Perkiraan</a>
+                <a href="kode_perkiraan.php?id=<?php echo $bruder_id; ?>" class="sidebar-link active flex items-center px-6 py-3 text-gray-800 transition">Kode Perkiraan</a>
                 <a href="kas_harian.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Harian</a>
-                <a href="bank.php" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bank</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bruder</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">LU Komunitas</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
-                <a href="#" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
+                <a href="bank.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bank</a>
+                <a href="bruder.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Bruder</a>
+                <a href="lu_komunitas.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">LU Komunitas</a>
+                <a href="evaluasi.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Evaluasi</a>
+                <a href="buku_besar.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Buku Besar</a>
+                <a href="kas_opname.php?id=<?php echo $bruder_id; ?>" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-100 transition">Kas Opname</a>
             </nav>
             <div class="p-6 border-t">
+                 <a href="laporan.php" class="w-full text-center mb-4 bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition block">
+                    Kembali
+                </a>
                 <a href="kode_perkiraan.php?action=logout" class="w-full text-center bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition">
                     Keluar
                 </a>
@@ -79,7 +134,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         <!-- Konten Utama -->
         <main class="flex-1 p-8">
             <div class="bg-white rounded-2xl shadow-lg p-8 h-full overflow-y-auto">
-                <h1 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">KODE PERKIRAAN PEMBUKUAN KOMUNITAS BRUDER FIC</h1>
+                <h1 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-4 text-center">KODE PERKIRAAN PEMBUKUAN<br>KOMUNITAS BRUDER FIC</h1>
                 <table class="w-full text-left text-sm">
                     <thead class="border-b-2">
                         <tr>
@@ -89,58 +144,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="font-bold bg-gray-50"><td colspan="3">PENERIMAAN</td></tr>
-                        <tr><td>A</td><td>110101</td><td>Kas</td></tr>
-                        <tr><td>B</td><td>110301</td><td>Bank</td></tr>
-                        <tr><td>C</td><td>410101</td><td>Gaji/Pendapatan Bruder</td></tr>
-                        <tr><td>D</td><td>410102</td><td>Pakaian Bruder</td></tr>
-                        <tr><td>E</td><td>430101</td><td>Hasil Kebun Dan Piaraan</td></tr>
-                        <tr><td>F</td><td>420101</td><td>Bunga Tabungan</td></tr>
-                        <tr><td>G</td><td>410202</td><td>Sumbangan</td></tr>
-                        <tr><td>H</td><td>430103</td><td>Penerimaan Lainnya</td></tr>
-                        <tr><td>I</td><td>610100</td><td>Penerimaan dari DP</td></tr>
-                        
-                        <tr class="font-bold bg-gray-50"><td colspan="3">PENGELUARAN</td></tr>
-                        <?php
-                        $pengeluaran = [
-                            1 => ['510101', 'Makanan'], 2 => ['510201', 'Pakaian Dan Perlengkapan Pribadi'],
-                            3 => ['510301', 'Pemeriksaan Dan Pengobatan'], 4 => ['510303', 'Hiburan / Rekreasi'],
-                            5 => ['510501', 'Transport Harian'], 6 => ['520101', 'Sewa Pribadi'],
-                            7 => ['510102', 'Bahan Bakar Dapur'], 8 => ['510103', 'Perlengkapan Cuci Dan Kebersihan'],
-                            9 => ['510104', 'Perabot Rumah Tangga'], 10 => ['510105', 'Iuran Hidup Bermasyarakat Dan Menggereja'],
-                            11 => ['510401', 'Listrik'], 12 => ['510402', 'Air'],
-                            13 => ['510403', 'Telepon Dan Internet'], 14 => ['520201', 'Keperluan Ibadah'],
-                            15 => ['530302', 'Sumbangan'], 16 => ['540101', 'Upah ART'],
-                            17 => ['540201', 'Pemeliharaan Rumah'], 18 => ['540202', 'Pemeliharaan Kebun Dan Piaran'],
-                            19 => ['540203', 'Pemeliharaan Kendaraan'], 20 => ['540204', 'Pemeliharaan Mesin Dan Peralatan'],
-                            21 => ['550101', 'Administrasi Komunitas'], 22 => ['550102', 'Legal dan Perijinan'],
-                            23 => ['550106', 'Pajak Jalan & STNK'], 24 => ['550107', 'Administrasi Bank'],
-                            25 => ['550201', 'Pajak Bunga Bank'], 26 => ['550202', 'Pajak Kendaraan dan PBB'],
-                            27 => ['110202', 'Kas Kecil DP'], 28 => ['110201', 'Kas Kecil Komunitas'],
-                        ];
-                        foreach ($pengeluaran as $no => $data) {
-                            echo "<tr><td>$no</td><td>{$data[0]}</td><td>{$data[1]}</td></tr>";
-                        }
-                        ?>
-
-                        <tr class="font-bold bg-gray-50"><td colspan="3">LANSIA</td></tr>
-                        <tr><td>29</td><td>520501</td><td>Penunjang Kesehatan Lansia</td></tr>
-                        <tr><td>30</td><td>520502</td><td>Pemeliharaan Rohani Lansia</td></tr>
-                        <tr><td>31</td><td>520503</td><td>Kegiatan Bruder Lansia</td></tr>
-
-                        <tr class="font-bold bg-gray-50"><td colspan="3">BUDGET KHUSUS</td></tr>
-                        <tr><td>32</td><td>150201</td><td>Mesin dan Peralatan</td></tr>
-                        <tr><td>33</td><td>510100</td><td>Perabot Rumah Tangga</td></tr>
-                        <tr><td>34</td><td>510502</td><td>Transport Pertemuan</td></tr>
-                        <tr><td>35</td><td>520300</td><td>Perayaan/Syukur</td></tr>
-                        <tr><td>36</td><td>520400</td><td>Kegiatan Lainnya</td></tr>
-                        <tr><td>37</td><td>540200</td><td>Pemeliharaan Rumah</td></tr>
-                        <tr><td>38</td><td>550100</td><td>Budget Khusus Lainnya</td></tr>
-
-                        <tr class="font-bold bg-gray-50"><td colspan="3">BIAYA DP</td></tr>
-                        <tr><td>39</td><td>510302</td><td>Pemeriksaan Dan Pengobatan</td></tr>
-                        <tr><td>40</td><td>550301</td><td>Pertemuan DP</td></tr>
-                        <tr><td>41</td><td>550100</td><td>Kegiatan Adm. DP</td></tr>
+                        <?php foreach ($data_perkiraan as $kategori => $items): ?>
+                            <?php if (!empty($items)): ?>
+                                <tr class="font-bold bg-gray-50"><td colspan="3"><?php echo $kategori; ?></td></tr>
+                                <?php foreach ($items as $item): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($item['pos']); ?></td>
+                                        <td><?php echo htmlspecialchars($item['kode_perkiraan']); ?></td>
+                                        <td><?php echo htmlspecialchars($item['nama_akun']); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
@@ -148,3 +163,4 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     </div>
 </body>
 </html>
+
