@@ -100,13 +100,27 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         <main class="flex-1 bg-[#002244] p-8">
             <div class="bg-white rounded-2xl shadow-lg p-8 h-full overflow-y-auto">
                 <!-- Header Konten -->
-                <div class="flex justify-between items-center mb-6">
-                    <h1 class="text-3xl font-bold text-gray-800">Daftar Anggaran Bruder</h1>
-                     <div class="relative">
-                        <input type="text" placeholder="Cari nama..." class="border rounded-full py-2 px-4 pl-10 w-64 focus:outline-none focus:ring-2 focus:ring-[#003366]">
+                <div class="border-b pb-4 mb-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h1 class="text-3xl font-bold text-gray-800">Daftar Anggaran Bruder</h1>
+                        <div class="text-right">
+                            <p class="text-sm font-semibold text-gray-500">Cabang</p>
+                            <p class="text-lg font-bold text-gray-800"><?php echo htmlspecialchars($_SESSION['kode_cabang'] . ' - ' . $_SESSION['nama_cabang']); ?></p>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="searchInput" placeholder="Cari nama..." class="border rounded-full py-2 px-4 pl-10 w-64 focus:outline-none focus:ring-2 focus:ring-[#003366]">
                         <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path></svg>
                     </div>
                 </div>
+
+                <!-- Loading Spinner -->
+                <div id="loadingSpinner" class="flex justify-center mb-4 hidden">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366]"></div>
+                </div>
+
+                <!-- Search Results Message -->
+                <div id="searchMessage" class="mb-4 text-gray-600 hidden"></div>
 
                 <!-- Tabel Data Dinamis -->
                 <div class="w-full">
@@ -146,5 +160,147 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             </div>
         </main>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const searchMessage = document.getElementById('searchMessage');
+            const tbody = document.querySelector('tbody');
+
+            let searchTimeout;
+
+            // Function to show loading
+            function showLoading(show = true) {
+                loadingSpinner.classList.toggle('hidden', !show);
+            }
+
+            // Function to show search message
+            function showSearchMessage(message, type = 'info') {
+                searchMessage.textContent = message;
+                searchMessage.className = `mb-4 text-${type === 'error' ? 'red' : 'gray'}-600`;
+                searchMessage.classList.remove('hidden');
+            }
+
+            // Function to hide search message
+            function hideSearchMessage() {
+                searchMessage.classList.add('hidden');
+            }
+
+            // Function to update table with search results
+            function updateTable(bruderList) {
+                let html = '';
+
+                if (bruderList && bruderList.length > 0) {
+                    bruderList.forEach((bruder, index) => {
+                        html += `
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-4 px-4 text-gray-700">${index + 1}</td>
+                                <td class="py-4 px-4 text-gray-700 font-medium">${bruder.nama_bruder}</td>
+                                <td class="py-4 px-4 text-center">
+                                    <a href="anggaran.php?id=${bruder.id_bruder}" class="bg-[#003366] text-white font-semibold py-2 px-6 rounded-full hover:bg-[#004488] transition">
+                                        Pilih
+                                    </a>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    html = '<tr><td colspan="3" class="text-center py-10 text-gray-500">Tidak ada data bruder yang ditemukan.</td></tr>';
+                }
+
+                tbody.innerHTML = html;
+            }
+
+            // Function to perform search
+            function performSearch(query) {
+                if (query.length < 2) {
+                    // Load all bruder if query is too short
+                    loadAllBruder();
+                    return;
+                }
+
+                showLoading(true);
+                hideSearchMessage();
+
+                const urlParams = new URLSearchParams({
+                    action: 'search_bruder',
+                    q: query
+                });
+
+                fetch(`ajax_handler.php?${urlParams}`)
+                .then(response => response.json())
+                .then(data => {
+                    showLoading(false);
+
+                    if (data.success) {
+                        updateTable(data.data);
+                        if (data.data && data.data.length > 0) {
+                            showSearchMessage(`Ditemukan ${data.data.length} hasil untuk "${query}"`);
+                        } else {
+                            showSearchMessage(`Tidak ditemukan hasil untuk "${query}"`, 'error');
+                        }
+                    } else {
+                        showSearchMessage('Terjadi kesalahan saat mencari data', 'error');
+                        console.error('Search error:', data.message);
+                    }
+                })
+                .catch(error => {
+                    showLoading(false);
+                    showSearchMessage('Terjadi kesalahan. Silakan coba lagi.', 'error');
+                    console.error('Search error:', error);
+                });
+            }
+
+            // Function to load all bruder
+            function loadAllBruder() {
+                showLoading(true);
+                hideSearchMessage();
+
+                fetch('ajax_handler.php?action=get_bruder_list')
+                .then(response => response.json())
+                .then(data => {
+                    showLoading(false);
+
+                    if (data.success) {
+                        updateTable(data.data);
+                    } else {
+                        showSearchMessage('Gagal memuat data bruder', 'error');
+                        console.error('Load bruder error:', data.message);
+                    }
+                })
+                .catch(error => {
+                    showLoading(false);
+                    showSearchMessage('Terjadi kesalahan saat memuat data', 'error');
+                    console.error('Load bruder error:', error);
+                });
+            }
+
+            // Search input event listener with debounce
+            searchInput.addEventListener('input', function(e) {
+                const query = e.target.value.trim();
+
+                // Clear previous timeout
+                clearTimeout(searchTimeout);
+
+                // Set new timeout for debounce (300ms)
+                searchTimeout = setTimeout(() => {
+                    performSearch(query);
+                }, 300);
+            });
+
+            // Initial load - load all bruder
+            loadAllBruder();
+
+            // Enter key support
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const query = e.target.value.trim();
+                    performSearch(query);
+                }
+            });
+        });
+    </script>
 </body>
 </html>

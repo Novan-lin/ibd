@@ -133,15 +133,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         <main class="flex-1 p-8">
             <div class="bg-white rounded-2xl shadow-lg p-8 h-full flex flex-col">
                 <!-- Header -->
-                <div class="flex items-center space-x-4 border-b pb-4 mb-6">
-                    <div>
-                        <p class="text-lg font-semibold text-gray-500">No.</p>
-                        <p class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($nomor_bruder); ?></p>
+                <div class="border-b pb-4 mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h1 class="text-2xl font-bold text-gray-800">Kas Harian</h1>
+                        <div class="text-right">
+                            <p class="text-sm font-semibold text-gray-500">Cabang</p>
+                            <p class="text-lg font-bold text-gray-800"><?php echo htmlspecialchars($_SESSION['kode_cabang'] . ' - ' . $_SESSION['nama_cabang']); ?></p>
+                        </div>
                     </div>
-                    <div class="border-l h-12"></div>
-                    <div>
-                        <p class="text-lg font-semibold text-gray-500">Nama</p>
-                        <p class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($bruder_name); ?></p>
+                    <div class="flex items-center space-x-4">
+                        <div>
+                            <p class="text-lg font-semibold text-gray-500">No.</p>
+                            <p class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($nomor_bruder); ?></p>
+                        </div>
+                        <div class="border-l h-12"></div>
+                        <div>
+                            <p class="text-lg font-semibold text-gray-500">Nama</p>
+                            <p class="text-xl font-bold text-gray-800"><?php echo htmlspecialchars($bruder_name); ?></p>
+                        </div>
                     </div>
                 </div>
 
@@ -153,17 +162,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                     <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert"><?php echo $pesan_error; ?></div>
                 <?php endif; ?>
 
+                <!-- Loading Spinner for Form -->
+                <div id="formLoadingSpinner" class="mb-4 hidden flex justify-center">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-[#003366]"></div>
+                </div>
+
+                <!-- Form Messages -->
+                <div id="formSuccessMessage" class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg hidden" role="alert">
+                    <span class="block sm:inline"></span>
+                </div>
+                <div id="formErrorMessage" class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg hidden" role="alert">
+                    <span class="block sm:inline"></span>
+                </div>
+
                 <!-- Form Tambah Transaksi -->
                 <div class="mb-8 p-6 border rounded-lg bg-gray-50">
                     <h2 class="text-xl font-bold text-gray-700 mb-4">Tambah Transaksi Kas Harian</h2>
-                    <form method="POST" action="kas_harian.php?id=<?php echo $bruder_id; ?>" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
+                    <form id="transactionForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                         <div>
                             <label for="tanggal" class="block text-sm font-medium text-gray-700">Tanggal</label>
-                            <input type="date" name="tanggal" required value="<?php echo date('Y-m-d'); ?>" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                            <input type="date" name="tanggal" id="tanggal" required value="<?php echo date('Y-m-d'); ?>" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003366]">
                         </div>
                         <div>
                             <label for="id_perkiraan" class="block text-sm font-medium text-gray-700">Kode Perkiraan</label>
-                            <select name="id_perkiraan" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                            <select name="id_perkiraan" id="id_perkiraan" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003366]">
                                 <option value="">-- Pilih Akun --</option>
                                 <?php if (isset($result_perkiraan)) { while($kp = $result_perkiraan->fetch_assoc()): ?>
                                 <option value="<?php echo $kp['id_perkiraan']; ?>"><?php echo htmlspecialchars($kp['kode_perkiraan'] . ' - ' . $kp['nama_akun']); ?></option>
@@ -172,21 +194,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                         </div>
                         <div>
                             <label for="tipe_transaksi" class="block text-sm font-medium text-gray-700">Tipe</label>
-                            <select name="tipe_transaksi" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                            <select name="tipe_transaksi" id="tipe_transaksi" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003366]">
                                 <option value="Pengeluaran">Pengeluaran</option>
                                 <option value="Penerimaan">Penerimaan</option>
                             </select>
                         </div>
                         <div class="md:col-span-2 lg:col-span-1">
                             <label for="keterangan" class="block text-sm font-medium text-gray-700">Keterangan</label>
-                            <input type="text" name="keterangan" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                            <input type="text" name="keterangan" id="keterangan" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003366]">
                         </div>
                         <div>
                             <label for="nominal" class="block text-sm font-medium text-gray-700">Nominal (Rp)</label>
-                            <input type="number" step="0.01" name="nominal" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm">
+                            <input type="number" step="0.01" name="nominal" id="nominal" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#003366]">
                         </div>
                         <div class="lg:col-span-3 text-right">
-                            <button type="submit" name="tambah_transaksi_kas" class="inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-full text-white bg-[#003366] hover:bg-[#004488]">
+                            <button type="button" id="submitTransactionBtn" class="inline-flex justify-center py-2 px-6 border border-transparent shadow-sm text-sm font-medium rounded-full text-white bg-[#003366] hover:bg-[#004488] transition duration-200">
                                 Simpan Transaksi
                             </button>
                         </div>
@@ -206,6 +228,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                                 <th>Reff</th>
                                 <th>Penerimaan</th>
                                 <th>Pengeluaran</th>
+                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -233,6 +256,431 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             </div>
         </main>
     </div>
+
+    <!-- Edit Transaction Modal -->
+    <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">Edit Transaksi</h3>
+                <button id="closeEditModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="editTransactionForm">
+                <input type="hidden" id="editTransactionId" name="transaction_id">
+
+                <div class="mb-4">
+                    <label for="editTanggal" class="block text-sm font-medium text-gray-700 mb-2">Tanggal</label>
+                    <input type="date" id="editTanggal" name="tanggal" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]">
+                </div>
+
+                <div class="mb-4">
+                    <label for="editPerkiraan" class="block text-sm font-medium text-gray-700 mb-2">Kode Perkiraan</label>
+                    <select id="editPerkiraan" name="id_perkiraan" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]">
+                        <option value="">-- Pilih Akun --</option>
+                        <?php if (isset($result_perkiraan)) {
+                            $result_perkiraan->data_seek(0); // Reset pointer
+                            while($kp = $result_perkiraan->fetch_assoc()): ?>
+                        <option value="<?php echo $kp['id_perkiraan']; ?>"><?php echo htmlspecialchars($kp['kode_perkiraan'] . ' - ' . $kp['nama_akun']); ?></option>
+                        <?php endwhile; } ?>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="editTipe" class="block text-sm font-medium text-gray-700 mb-2">Tipe Transaksi</label>
+                    <select id="editTipe" name="tipe_transaksi" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]">
+                        <option value="Pengeluaran">Pengeluaran</option>
+                        <option value="Penerimaan">Penerimaan</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="editKeterangan" class="block text-sm font-medium text-gray-700 mb-2">Keterangan</label>
+                    <input type="text" id="editKeterangan" name="keterangan" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]">
+                </div>
+
+                <div class="mb-4">
+                    <label for="editNominal" class="block text-sm font-medium text-gray-700 mb-2">Nominal (Rp)</label>
+                    <input type="number" step="0.01" id="editNominal" name="nominal" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#003366]">
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" id="cancelEditBtn"
+                            class="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
+                        Batal
+                    </button>
+                    <button type="button" id="saveEditBtn"
+                            class="px-4 py-2 bg-[#003366] text-white rounded-md hover:bg-[#004488]">
+                        Simpan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const transactionForm = document.getElementById('transactionForm');
+            const submitBtn = document.getElementById('submitTransactionBtn');
+            const formLoadingSpinner = document.getElementById('formLoadingSpinner');
+            const formSuccessMessage = document.getElementById('formSuccessMessage');
+            const formErrorMessage = document.getElementById('formErrorMessage');
+            const bruderId = <?php echo $bruder_id; ?>;
+
+            // Function to show form messages
+            function showFormMessage(element, message, type = 'error') {
+                element.querySelector('span').textContent = message;
+                element.className = `mb-4 px-4 py-3 rounded-lg ${type === 'error' ?
+                    'bg-red-100 border border-red-400 text-red-700' :
+                    'bg-green-100 border border-green-400 text-green-700'}`;
+                element.classList.remove('hidden');
+            }
+
+            function hideFormMessages() {
+                formSuccessMessage.classList.add('hidden');
+                formErrorMessage.classList.add('hidden');
+            }
+
+            function showFormLoading(show = true) {
+                formLoadingSpinner.classList.toggle('hidden', !show);
+                submitBtn.disabled = show;
+                if (show) {
+                    submitBtn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>';
+                } else {
+                    submitBtn.innerHTML = 'Simpan Transaksi';
+                }
+            }
+
+            // AJAX Transaction submission
+            function submitTransaction() {
+                const formData = new FormData(transactionForm);
+                formData.append('action', 'add_transaction');
+                formData.append('bruder_id', bruderId);
+                formData.append('sumber_dana', 'Kas Harian');
+
+                hideFormMessages();
+                showFormLoading(true);
+
+                fetch('ajax_handler.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    showFormLoading(false);
+
+                    if (data.success) {
+                        showFormMessage(formSuccessMessage, data.message, 'success');
+                        transactionForm.reset();
+                        // Refresh transaction table
+                        loadTransactions();
+                        // Hide success message after 3 seconds
+                        setTimeout(() => {
+                            formSuccessMessage.classList.add('hidden');
+                        }, 3000);
+                    } else {
+                        showFormMessage(formErrorMessage, data.message);
+                    }
+                })
+                .catch(error => {
+                    showFormLoading(false);
+                    showFormMessage(formErrorMessage, 'Terjadi kesalahan. Silakan coba lagi.');
+                    console.error('Transaction error:', error);
+                });
+            }
+
+            // Load transactions dynamically
+            function loadTransactions() {
+                if (bruderId <= 0) return;
+
+                const urlParams = new URLSearchParams({
+                    action: 'get_transactions',
+                    bruder_id: bruderId,
+                    sumber_dana: 'Kas Harian'
+                });
+
+                fetch(`ajax_handler.php?${urlParams}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        updateTransactionTable(data.data);
+                    } else {
+                        console.error('Failed to load transactions:', data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading transactions:', error);
+                });
+            }
+
+            // Update transaction table
+            function updateTransactionTable(transactions) {
+                const tbody = document.querySelector('tbody');
+                let html = '';
+
+                if (transactions && transactions.length > 0) {
+                    transactions.forEach(transaction => {
+                        const date = new Date(transaction.tanggal_transaksi);
+                        const formattedDate = date.toLocaleDateString('id-ID');
+
+                        // Determine transaction type and nominal
+                        let tipeTransaksi = '';
+                        let nominalValue = 0;
+                        if (transaction.nominal_penerimaan > 0) {
+                            tipeTransaksi = 'Penerimaan';
+                            nominalValue = transaction.nominal_penerimaan;
+                        } else if (transaction.nominal_pengeluaran > 0) {
+                            tipeTransaksi = 'Pengeluaran';
+                            nominalValue = transaction.nominal_pengeluaran;
+                        }
+
+                        html += `
+                            <tr data-transaction-id="${transaction.id_transaksi}">
+                                <td>${formattedDate}</td>
+                                <td>${transaction.pos || ''}</td>
+                                <td>${transaction.kode_perkiraan || ''}</td>
+                                <td>${transaction.nama_akun || ''}</td>
+                                <td>${transaction.keterangan || ''}</td>
+                                <td>${transaction.reff || ''}</td>
+                                <td class="text-right">Rp ${Number(transaction.nominal_penerimaan || 0).toLocaleString('id-ID')}</td>
+                                <td class="text-right">Rp ${Number(transaction.nominal_pengeluaran || 0).toLocaleString('id-ID')}</td>
+                                <td class="text-center">
+                                    <div class="flex space-x-2 justify-center">
+                                        <button class="edit-btn bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
+                                                data-transaction-id="${transaction.id_transaksi}"
+                                                data-tanggal="${transaction.tanggal_transaksi}"
+                                                data-perkiraan="${transaction.id_perkiraan}"
+                                                data-tipe="${tipeTransaksi}"
+                                                data-nominal="${nominalValue}"
+                                                data-keterangan="${transaction.keterangan || ''}">
+                                            Edit
+                                        </button>
+                                        <button class="delete-btn bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600"
+                                                data-transaction-id="${transaction.id_transaksi}">
+                                            Hapus
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    html = '<tr><td colspan="9" class="text-center py-10 text-gray-500">Belum ada transaksi kas harian untuk bruder ini.</td></tr>';
+                }
+
+                tbody.innerHTML = html;
+
+                // Attach event listeners to new buttons
+                attachActionButtonListeners();
+            }
+
+            // Event listeners
+            submitBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                submitTransaction();
+            });
+
+            // Enter key support for form
+            transactionForm.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && e.target.type !== 'textarea') {
+                    e.preventDefault();
+                    submitTransaction();
+                }
+            });
+
+            // Load transactions on page load if bruder_id exists
+            if (bruderId > 0) {
+                loadTransactions();
+            }
+
+            // Auto-format nominal input
+            const nominalInput = document.getElementById('nominal');
+            nominalInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/[^\d]/g, '');
+                if (value) {
+                    e.target.value = parseInt(value).toLocaleString('id-ID');
+                }
+            });
+
+            nominalInput.addEventListener('focus', function(e) {
+                // Remove formatting for easier editing
+                e.target.value = e.target.value.replace(/[^\d]/g, '');
+            });
+
+            // Modal elements
+            const editModal = document.getElementById('editModal');
+            const closeEditModal = document.getElementById('closeEditModal');
+            const cancelEditBtn = document.getElementById('cancelEditBtn');
+            const saveEditBtn = document.getElementById('saveEditBtn');
+            const editTransactionForm = document.getElementById('editTransactionForm');
+
+            let currentEditTransactionId = null;
+
+            // Function to show edit modal
+            function showEditModal(transactionData) {
+                currentEditTransactionId = transactionData.transactionId;
+
+                document.getElementById('editTransactionId').value = transactionData.transactionId;
+                document.getElementById('editTanggal').value = transactionData.tanggal;
+                document.getElementById('editPerkiraan').value = transactionData.perkiraan;
+                document.getElementById('editTipe').value = transactionData.tipe;
+                document.getElementById('editKeterangan').value = transactionData.keterangan;
+                document.getElementById('editNominal').value = transactionData.nominal;
+
+                editModal.classList.remove('hidden');
+            }
+
+            // Function to hide edit modal
+            function hideEditModal() {
+                editModal.classList.add('hidden');
+                currentEditTransactionId = null;
+                editTransactionForm.reset();
+            }
+
+            // Function to show loading in modal
+            function showModalLoading(show = true) {
+                saveEditBtn.disabled = show;
+                if (show) {
+                    saveEditBtn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>';
+                } else {
+                    saveEditBtn.innerHTML = 'Simpan';
+                }
+            }
+
+            // AJAX Edit transaction
+            function editTransaction() {
+                const formData = new FormData(editTransactionForm);
+                formData.append('action', 'edit_transaction');
+                formData.append('bruder_id', bruderId);
+
+                showModalLoading(true);
+
+                fetch('ajax_handler.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    showModalLoading(false);
+
+                    if (data.success) {
+                        hideEditModal();
+                        showFormMessage(formSuccessMessage, data.message, 'success');
+                        loadTransactions(); // Refresh table
+                        setTimeout(() => {
+                            formSuccessMessage.classList.add('hidden');
+                        }, 3000);
+                    } else {
+                        alert('Gagal mengedit transaksi: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    showModalLoading(false);
+                    alert('Terjadi kesalahan. Silakan coba lagi.');
+                    console.error('Edit transaction error:', error);
+                });
+            }
+
+            // AJAX Delete transaction
+            function deleteTransaction(transactionId) {
+                if (!confirm('Apakah Anda yakin ingin menghapus transaksi ini?')) {
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('action', 'delete_transaction');
+                formData.append('transaction_id', transactionId);
+                formData.append('bruder_id', bruderId);
+
+                fetch('ajax_handler.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showFormMessage(formSuccessMessage, data.message, 'success');
+                        loadTransactions(); // Refresh table
+                        setTimeout(() => {
+                            formSuccessMessage.classList.add('hidden');
+                        }, 3000);
+                    } else {
+                        alert('Gagal menghapus transaksi: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('Terjadi kesalahan. Silakan coba lagi.');
+                    console.error('Delete transaction error:', error);
+                });
+            }
+
+            // Attach event listeners to action buttons
+            function attachActionButtonListeners() {
+                // Edit buttons
+                document.querySelectorAll('.edit-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const data = this.dataset;
+                        showEditModal({
+                            transactionId: data.transactionId,
+                            tanggal: data.tanggal,
+                            perkiraan: data.perkiraan,
+                            tipe: data.tipe,
+                            nominal: data.nominal,
+                            keterangan: data.keterangan
+                        });
+                    });
+                });
+
+                // Delete buttons
+                document.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const transactionId = this.dataset.transactionId;
+                        deleteTransaction(transactionId);
+                    });
+                });
+            }
+
+            // Modal event listeners
+            closeEditModal.addEventListener('click', hideEditModal);
+            cancelEditBtn.addEventListener('click', hideEditModal);
+            saveEditBtn.addEventListener('click', editTransaction);
+
+            // Close modal when clicking outside
+            editModal.addEventListener('click', function(e) {
+                if (e.target === editModal) {
+                    hideEditModal();
+                }
+            });
+
+            // Enter key support for edit form
+            editTransactionForm.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && e.target.type !== 'textarea') {
+                    e.preventDefault();
+                    editTransaction();
+                }
+            });
+
+            // Auto-format edit nominal input
+            const editNominalInput = document.getElementById('editNominal');
+            editNominalInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/[^\d]/g, '');
+                if (value) {
+                    e.target.value = parseInt(value).toLocaleString('id-ID');
+                }
+            });
+
+            editNominalInput.addEventListener('focus', function(e) {
+                e.target.value = e.target.value.replace(/[^\d]/g, '');
+            });
+        });
+    </script>
 </body>
 </html>
-
