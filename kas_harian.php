@@ -20,6 +20,7 @@ $bruder_id = (int)($_GET['id'] ?? 0);
 $bruder_name = 'Pilih Bruder Dahulu';
 $nomor_bruder = '-';
 $transactions = null;
+$pending_approvals = null; // Variabel baru untuk pengajuan
 $pesan_sukses = '';
 $pesan_error = '';
 
@@ -78,6 +79,24 @@ if ($bruder_id > 0) {
     $result_perkiraan = $conn->query("SELECT id_perkiraan, kode_perkiraan, nama_akun FROM kode_perkiraan ORDER BY kode_perkiraan");
 }
 
+// Ambil data pengajuan yang menunggu persetujuan untuk cabang ini
+$id_cabang_session = $_SESSION['id_cabang'] ?? 0;
+if ($id_cabang_session > 0) {
+    $stmt_pending = $conn->prepare(
+        "SELECT p.id_pengajuan, p.tanggal_pengajuan, b.nama_bruder, kp.nama_akun, p.keterangan, p.nominal, p.foto_bukti
+         FROM pengajuan_pengeluaran p
+         JOIN bruder b ON p.id_bruder = b.id_bruder
+         JOIN kode_perkiraan kp ON p.id_perkiraan = kp.id_perkiraan
+         WHERE p.id_cabang = ? AND p.status = 'pending'
+         ORDER BY p.tanggal_pengajuan ASC"
+    );
+    $stmt_pending->bind_param("i", $id_cabang_session);
+    $stmt_pending->execute();
+    $pending_approvals = $stmt_pending->get_result();
+    $stmt_pending->close();
+}
+
+
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = array();
     session_destroy();
@@ -98,6 +117,42 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         .sidebar-link.active { background-color: #F3F4F6; font-weight: 600; }
         th, td { padding: 0.75rem 1rem; border: 1px solid #E5E7EB; text-align: left; }
         th { background-color: #F9FAFB; }
+
+        /* CSS Fallback untuk memastikan tabel selalu terlihat */
+        #pendingApprovalsTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            background-color: white;
+            display: table;
+        }
+
+        #pendingApprovalsTable thead {
+            background-color: #F9FAFB;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        #pendingApprovalsTable tbody {
+            display: table-row-group;
+        }
+
+        #pendingApprovalsTable tr {
+            display: table-row;
+            border-bottom: 1px solid #E5E7EB;
+        }
+
+        #pendingApprovalsTable td {
+            display: table-cell;
+            padding: 0.75rem;
+            vertical-align: middle;
+        }
+
+        /* Pastikan tabel selalu terlihat */
+        #pendingApprovalsTable {
+            min-height: 100px;
+        }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -130,8 +185,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
         </aside>
 
         <!-- Konten Utama -->
-        <main class="flex-1 p-8">
-            <div class="bg-white rounded-2xl shadow-lg p-8 h-full flex flex-col">
+        <main class="flex-1 p-4 overflow-y-auto" style="max-height: calc(100vh - 2rem);">
+            <div class="bg-white rounded-2xl shadow-lg p-6 max-w-full overflow-y-auto" style="height: calc(100vh - 4rem);">
                 <!-- Header -->
                 <div class="border-b pb-4 mb-6">
                     <div class="flex items-center justify-between mb-4">
@@ -215,7 +270,51 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                     </form>
                 </div>
 
+                <!-- Bagian Persetujuan Pengeluaran -->
+                <div class="mb-8 p-6 border rounded-lg bg-gray-50">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">Menunggu Persetujuan (<?php echo $pending_approvals ? $pending_approvals->num_rows : 0; ?>)</h2>
+                    <div class="overflow-y-auto" style="max-height: 300px;">
+                        <table id="pendingApprovalsTable" class="w-full text-sm">
+                            <thead class="sticky top-0 bg-gray-100">
+                                <tr>
+                                    <th class="px-3 py-2">Tanggal</th>
+                                    <th class="px-3 py-2">Bruder</th>
+                                    <th class="px-3 py-2">Keterangan</th>
+                                    <th class="px-3 py-2 text-right">Nominal</th>
+                                    <th class="px-3 py-2 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if ($pending_approvals && $pending_approvals->num_rows > 0): ?>
+                                    <?php while($row = $pending_approvals->fetch_assoc()): ?>
+                                    <tr class="border-b hover:bg-gray-100">
+                                        <td class="px-3 py-2"><?php echo htmlspecialchars(date('d-m-Y H:i', strtotime($row['tanggal_pengajuan']))); ?></td>
+                                        <td class="px-3 py-2"><?php echo htmlspecialchars($row['nama_bruder']); ?></td>
+                                        <td class="px-3 py-2"><?php echo htmlspecialchars($row['keterangan']); ?></td>
+                                        <td class="px-3 py-2 text-right font-semibold">Rp <?php echo number_format($row['nominal'], 0, ',', '.'); ?></td>
+                                        <td class="px-3 py-2 text-center">
+                                            <div class="flex justify-center space-x-2">
+                                                <?php if (!empty($row['foto_bukti'])): ?>
+                                                    <a href="uploads/bruder_photos/<?php echo htmlspecialchars($row['foto_bukti']); ?>" target="_blank" class="text-blue-600 hover:underline text-xs p-1 bg-blue-100 rounded">Lihat Foto</a>
+                                                <?php endif; ?>
+                                                <button class="approve-btn text-green-600 hover:underline text-xs p-1 bg-green-100 rounded" data-id="<?php echo $row['id_pengajuan']; ?>">Setujui</button>
+                                                <button class="reject-btn text-red-600 hover:underline text-xs p-1 bg-red-100 rounded" data-id="<?php echo $row['id_pengajuan']; ?>">Tolak</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <?php endwhile; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-gray-500">Tidak ada pengajuan yang menunggu persetujuan.</td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Tabel Riwayat Kas Harian -->
+                <h2 class="text-xl font-bold text-gray-700 mb-4 mt-8">Riwayat Transaksi Final</h2>
                 <div class="flex-grow overflow-y-auto">
                     <table class="w-full text-sm">
                         <thead class="sticky top-0 bg-white">
@@ -680,6 +779,240 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             editNominalInput.addEventListener('focus', function(e) {
                 e.target.value = e.target.value.replace(/[^\d]/g, '');
             });
+
+            // =====================================================================
+            // LOGIKA PERSETUJUAN PENGAJUAN
+            // =====================================================================
+
+            const approvalSection = document.querySelector('.mb-8.p-6.border.rounded-lg.bg-gray-50');
+
+            // Modal Tolak Pengajuan
+            const rejectModal = document.createElement('div');
+            rejectModal.id = 'rejectModal';
+            rejectModal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 hidden flex items-center justify-center z-50';
+            rejectModal.innerHTML = `
+                <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">Tolak Pengajuan</h3>
+                        <button type="button" class="close-reject-modal text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <form id="rejectForm">
+                        <input type="hidden" id="rejectPengajuanId" name="id_pengajuan">
+                        <div class="mb-4">
+                            <label for="catatanBendahara" class="block text-sm font-medium text-gray-700 mb-2">Catatan Penolakan (Opsional)</label>
+                            <textarea id="catatanBendahara" name="catatan_bendahara" rows="4"
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"></textarea>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button type="button" class="close-reject-modal px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
+                                Batal
+                            </button>
+                            <button type="submit" id="submitRejectBtn"
+                                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                                Tolak Pengajuan
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(rejectModal);
+
+            function showRejectModal(pengajuanId) {
+                document.getElementById('rejectPengajuanId').value = pengajuanId;
+                rejectModal.classList.remove('hidden');
+            }
+
+            function hideRejectModal() {
+                rejectModal.classList.add('hidden');
+                document.getElementById('rejectForm').reset();
+            }
+
+            document.querySelectorAll('.close-reject-modal').forEach(btn => {
+                btn.addEventListener('click', hideRejectModal);
+            });
+
+            rejectModal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hideRejectModal();
+                }
+            });
+
+            document.getElementById('rejectForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.append('action', 'reject_pengeluaran');
+                
+                const submitRejectBtn = document.getElementById('submitRejectBtn');
+                submitRejectBtn.disabled = true;
+                submitRejectBtn.innerHTML = '<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>';
+
+                fetch('ajax_handler.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    submitRejectBtn.disabled = false;
+                    submitRejectBtn.innerHTML = 'Tolak Pengajuan';
+                    if (data.success) {
+                        alert(data.message);
+                        hideRejectModal();
+                        loadPendingApprovals(); // Refresh the pending list
+                    } else {
+                        alert('Gagal menolak pengajuan: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    submitRejectBtn.disabled = false;
+                    submitRejectBtn.innerHTML = 'Tolak Pengajuan';
+                    alert('Terjadi kesalahan. Silakan coba lagi.');
+                    console.error('Reject error:', error);
+                });
+            });
+
+            // Fungsi untuk memuat ulang daftar pengajuan yang tertunda
+            function loadPendingApprovals() {
+                if (<?php echo $id_cabang_session; ?> <= 0) return;
+
+                const urlParams = new URLSearchParams({
+                    action: 'get_pending_approvals',
+                    id_cabang: <?php echo $id_cabang_session; ?>
+                });
+
+                console.log('Loading pending approvals...');
+
+                fetch(`ajax_handler.php?${urlParams}`)
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    if (data.success) {
+                        console.log('Updating table with data:', data.data);
+                        updatePendingApprovalsTable(data.data);
+                    } else {
+                        console.error('Failed to load pending approvals:', data.message);
+                        // Pastikan tabel tetap terlihat meski error
+                        updatePendingApprovalsTable([]);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading pending approvals:', error);
+                    // Pastikan tabel tetap terlihat meski error
+                    updatePendingApprovalsTable([]);
+                });
+            }
+
+            // Fungsi untuk memperbarui tabel pengajuan yang tertunda
+            function updatePendingApprovalsTable(approvals) {
+                console.log('updatePendingApprovalsTable called with:', approvals);
+
+                const table = document.getElementById('pendingApprovalsTable');
+                if (!table) {
+                    console.error('Table #pendingApprovalsTable not found!');
+                    return;
+                }
+
+                const tbody = table.querySelector('tbody');
+                if (!tbody) {
+                    console.error('tbody not found in #pendingApprovalsTable!');
+                    return;
+                }
+
+                let html = '';
+
+                if (approvals && approvals.length > 0) {
+                    console.log('Processing', approvals.length, 'approvals');
+                    approvals.forEach((row, index) => {
+                        console.log('Processing row', index, ':', row);
+                        const fotoLink = row.foto_bukti ?
+                            `<a href="uploads/bruder_photos/${row.foto_bukti}" target="_blank" class="text-blue-600 hover:underline text-xs p-1 bg-blue-100 rounded">Lihat Foto</a>` : '';
+
+                        html += `
+                            <tr class="border-b hover:bg-gray-100">
+                                <td class="px-3 py-2">${new Date(row.tanggal_pengajuan).toLocaleString('id-ID')}</td>
+                                <td class="px-3 py-2">${row.nama_bruder || 'N/A'}</td>
+                                <td class="px-3 py-2">${row.keterangan || 'N/A'}</td>
+                                <td class="px-3 py-2 text-right font-semibold">Rp ${Number(row.nominal || 0).toLocaleString('id-ID')}</td>
+                                <td class="px-3 py-2 text-center">
+                                    <div class="flex justify-center space-x-2">
+                                        ${fotoLink}
+                                        <button class="approve-btn text-green-600 hover:underline text-xs p-1 bg-green-100 rounded" data-id="${row.id_pengajuan}">Setujui</button>
+                                        <button class="reject-btn text-red-600 hover:underline text-xs p-1 bg-red-100 rounded" data-id="${row.id_pengajuan}">Tolak</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    console.log('No approvals found, showing empty state');
+                    html = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Tidak ada pengajuan yang menunggu persetujuan.</td></tr>';
+                }
+
+                console.log('Setting tbody innerHTML with length:', html.length);
+                tbody.innerHTML = html;
+
+                // Re-attach listeners after updating table
+                setTimeout(() => {
+                    attachApprovalButtonListeners();
+                    console.log('Event listeners attached');
+                }, 100);
+            }
+
+            // Attach event listeners for approve/reject buttons
+            function attachApprovalButtonListeners() {
+                document.querySelectorAll('.approve-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const pengajuanId = this.dataset.id;
+                        if (confirm('Apakah Anda yakin ingin MENYETUJUI pengajuan ini?')) {
+                            handleApproval(pengajuanId, 'approve');
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.reject-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const pengajuanId = this.dataset.id;
+                        showRejectModal(pengajuanId);
+                    });
+                });
+            }
+
+            // Handle approval/rejection AJAX call
+            function handleApproval(pengajuanId, actionType) {
+                const formData = new FormData();
+                formData.append('action', actionType === 'approve' ? 'approve_pengeluaran' : 'reject_pengeluaran');
+                formData.append('id_pengajuan', pengajuanId);
+                // If rejecting, catatan_bendahara will be handled by the modal form
+
+                fetch('ajax_handler.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        loadPendingApprovals(); // Refresh the pending list
+                        loadTransactions(); // Refresh the final transactions list
+                    } else {
+                        alert('Gagal ' + (actionType === 'approve' ? 'menyetujui' : 'menolak') + ' pengajuan: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('Terjadi kesalahan. Silakan coba lagi.');
+                    console.error('Approval/Rejection error:', error);
+                });
+            }
+
+            // Initial load of pending approvals
+            loadPendingApprovals();
+            attachApprovalButtonListeners(); // Attach listeners on initial load
         });
     </script>
 </body>

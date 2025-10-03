@@ -22,62 +22,9 @@ $transactions = null;
 $pesan_sukses = '';
 $pesan_error = '';
 
-// --- LOGIKA PROSES FORM TAMBAH TRANSAKSI ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tambah_pengeluaran'])) {
-    $id_perkiraan = (int)$_POST['id_perkiraan'];
-    $tanggal = $_POST['tanggal'];
-    $keterangan = $_POST['keterangan'];
-    $nominal = (float)str_replace(['.', ','], ['', '.'], $_POST['nominal']);
-    $reff = $_POST['reff'] ?? null;
-
-    // Handle file upload
-    $foto_bukti = '';
-    if (isset($_FILES['foto_bukti']) && $_FILES['foto_bukti']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = 'uploads/bruder_photos/';
-        if (!file_exists($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-
-        $file_extension = strtolower(pathinfo($_FILES['foto_bukti']['name'], PATHINFO_EXTENSION));
-        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
-
-        if (in_array($file_extension, $allowed_extensions)) {
-            if ($_FILES['foto_bukti']['size'] <= 5 * 1024 * 1024) { // 5MB max
-                $foto_bukti = uniqid() . '.' . $file_extension;
-                $upload_path = $upload_dir . $foto_bukti;
-
-                if (move_uploaded_file($_FILES['foto_bukti']['tmp_name'], $upload_path)) {
-                    // File uploaded successfully
-                } else {
-                    $pesan_error = "Gagal mengupload foto bukti.";
-                }
-            } else {
-                $pesan_error = "Ukuran file foto terlalu besar. Maksimal 5MB.";
-            }
-        } else {
-            $pesan_error = "Format file foto tidak didukung. Gunakan JPG, PNG, atau GIF.";
-        }
-    }
-
-    if (empty($pesan_error)) {
-        // Memanggil Stored Procedure `catat_transaksi_keuangan_multi_cabang`
-        $id_cabang = $_SESSION['id_cabang'] ?? 1;
-        $stmt_proc = $conn->prepare("CALL catat_transaksi_keuangan_multi_cabang(?, ?, ?, ?, 'Kas Harian', 'Pengeluaran', ?, ?)");
-        $stmt_proc->bind_param("iissdi", $id_bruder, $id_perkiraan, $tanggal, $keterangan, $nominal, $id_cabang);
-
-        if ($stmt_proc->execute()) {
-            $pesan_sukses = "Pengeluaran berhasil dicatat!";
-
-            // Jika ada foto, simpan referensinya (untuk sementara disimpan di catatan)
-            if (!empty($foto_bukti)) {
-                $pesan_sukses .= " Foto bukti telah diupload.";
-            }
-        } else {
-            $pesan_error = "Gagal mencatat pengeluaran: " . $conn->error;
-        }
-        $stmt_proc->close();
-    }
-}
+// --- LOGIKA PROSES FORM TAMBAH TRANSAKSI (DIPINDAHKAN KE AJAX_HANDLER.PHP) ---
+// Logika ini sekarang ditangani oleh ajax_handler.php untuk alur persetujuan.
+// Pesan sukses/error akan di-handle oleh JavaScript.
 
 // Debug: Cek session dan data bruder
 echo "<!-- Debug Info:
@@ -86,43 +33,21 @@ Nama Bruder: $nama_bruder
 Session ID Cabang: " . ($_SESSION['id_cabang'] ?? 'NULL') . "
 -->";
 
-// Ambil Data Transaksi Pengeluaran untuk ditampilkan
+// Ambil Data Pengajuan Pengeluaran untuk ditampilkan
 $stmt_trans = $conn->prepare(
-    "SELECT t.id_transaksi, t.tanggal_transaksi, kp.pos, kp.kode_perkiraan, kp.nama_akun, t.keterangan, t.reff,
-            t.nominal_penerimaan, t.nominal_pengeluaran, t.id_cabang
-     FROM transaksi t
-     JOIN kode_perkiraan kp ON t.id_perkiraan = kp.id_perkiraan
-     WHERE t.id_bruder = ? AND t.sumber_dana = 'Kas Harian' AND t.nominal_pengeluaran > 0
-     ORDER BY t.tanggal_transaksi DESC, t.id_transaksi DESC"
+    "SELECT p.id_pengajuan, p.tanggal_pengajuan, kp.kode_perkiraan, kp.nama_akun, p.keterangan, p.nominal, p.status, p.catatan_bendahara
+     FROM pengajuan_pengeluaran p
+     JOIN kode_perkiraan kp ON p.id_perkiraan = kp.id_perkiraan
+     WHERE p.id_bruder = ?
+     ORDER BY p.tanggal_pengajuan DESC"
 );
 $stmt_trans->bind_param("i", $id_bruder);
 $stmt_trans->execute();
 $transactions = $stmt_trans->get_result();
 
 // Debug: Cek hasil query
-$debug_transaksi = $transactions->num_rows;
-echo "<!-- Debug: Ditemukan $debug_transaksi transaksi pengeluaran -->";
-
-if ($debug_transaksi === 0) {
-    // Debug: Cek apakah ada transaksi dengan nominal_pengeluaran = 0
-    $stmt_debug = $conn->prepare(
-        "SELECT id_transaksi, tanggal_transaksi, nominal_penerimaan, nominal_pengeluaran, keterangan
-         FROM transaksi
-         WHERE id_bruder = ? AND sumber_dana = 'Kas Harian'
-         ORDER BY tanggal_transaksi DESC LIMIT 5"
-    );
-    $stmt_debug->bind_param("i", $id_bruder);
-    $stmt_debug->execute();
-    $debug_result = $stmt_debug->get_result();
-
-    echo "<!-- Debug: Total transaksi bruder (termasuk penerimaan): " . $debug_result->num_rows . " -->";
-    if ($debug_result->num_rows > 0) {
-        while ($debug_row = $debug_result->fetch_assoc()) {
-            echo "<!-- Debug: Transaksi - ID: {$debug_row['id_transaksi']}, Tanggal: {$debug_row['tanggal_transaksi']}, Penerimaan: {$debug_row['nominal_penerimaan']}, Pengeluaran: {$debug_row['nominal_pengeluaran']}, Keterangan: {$debug_row['keterangan']} -->";
-        }
-    }
-    $stmt_debug->close();
-}
+$debug_transaksi = $transactions ? $transactions->num_rows : 0;
+echo "<!-- Debug: Ditemukan $debug_transaksi pengajuan pengeluaran -->";
 
 $stmt_trans->close();
 
@@ -358,6 +283,13 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                                 <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                                     <?php echo $transactions ? $transactions->num_rows : 0; ?> Total
                                 </span>
+                                <a href="kas_pengeluaran_bruder_full.php" target="_blank"
+                                   class="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors duration-200">
+                                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                                    </svg>
+                                    Lihat Lengkap
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -365,81 +297,82 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                         <table class="w-full text-sm">
                             <thead class="sticky top-0 bg-white shadow-sm z-10">
                                 <tr class="bg-gray-50">
-                                    <th class="px-4 py-3 text-left font-bold text-gray-900 border-b border-gray-200">
+                                    <th class="px-3 py-3 text-left font-bold text-gray-900 border-b border-gray-200 w-20">
                                         <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                             </svg>
                                             Tanggal
                                         </div>
                                     </th>
-                                    <th class="px-4 py-3 text-left font-bold text-gray-900 border-b border-gray-200">
+                                    <th class="px-3 py-3 text-left font-bold text-gray-900 border-b border-gray-200 w-24">
                                         <div class="flex items-center">
-                                            <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
                                             </svg>
-                                            Pos
+                                            Kode
                                         </div>
                                     </th>
-                                    <th class="px-4 py-3 text-left font-bold text-gray-900 border-b border-gray-200">Kode Perkiraan</th>
-                                    <th class="px-4 py-3 text-left font-bold text-gray-900 border-b border-gray-200">Akun</th>
-                                    <th class="px-4 py-3 text-left font-bold text-gray-900 border-b border-gray-200">Keterangan</th>
-                                    <th class="px-4 py-3 text-right font-bold text-gray-900 border-b border-gray-200">
+                                    <th class="px-3 py-3 text-left font-bold text-gray-900 border-b border-gray-200 min-w-48">
+                                        <div class="flex items-center">
+                                            <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                                            </svg>
+                                            Keterangan
+                                        </div>
+                                    </th>
+                                    <th class="px-3 py-3 text-right font-bold text-gray-900 border-b border-gray-200 w-32">
                                         <div class="flex items-center justify-end">
-                                            <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
                                             </svg>
                                             Nominal
                                         </div>
                                     </th>
-                                    <th class="px-4 py-3 text-center font-bold text-gray-900 border-b border-gray-200">Bukti</th>
+                                    <th class="px-3 py-3 text-center font-bold text-gray-900 border-b border-gray-200 w-28">Status</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
                                 <?php if ($transactions && $transactions->num_rows > 0): ?>
-                                    <?php while($row = $transactions->fetch_assoc()): ?>
-                                    <tr class="hover:bg-blue-50 transition-all duration-200 group">
-                                        <td class="px-4 py-3 text-gray-900 font-medium">
+                                    <?php while($row = $transactions->fetch_assoc()):
+                                        $status_bg = 'bg-yellow-100 text-yellow-800';
+                                        if ($row['status'] == 'disetujui') {
+                                            $status_bg = 'bg-green-100 text-green-800';
+                                        } elseif ($row['status'] == 'ditolak') {
+                                            $status_bg = 'bg-red-100 text-red-800';
+                                        }
+                                    ?>
+                                    <tr class="hover:bg-blue-50 transition-all duration-200">
+                                        <td class="px-3 py-3 text-gray-900 font-medium">
                                             <div class="flex flex-col">
-                                                <span class="font-semibold"><?php echo htmlspecialchars(date('d-m-Y', strtotime($row['tanggal_transaksi']))); ?></span>
-                                                <span class="text-xs text-gray-500"><?php echo htmlspecialchars(date('H:i', strtotime($row['tanggal_transaksi']))); ?></span>
+                                                <span class="font-semibold text-sm"><?php echo htmlspecialchars(date('d-m-Y', strtotime($row['tanggal_pengajuan']))); ?></span>
+                                                <span class="text-xs text-gray-500"><?php echo htmlspecialchars(date('H:i', strtotime($row['tanggal_pengajuan']))); ?></span>
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3">
-                                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                <?php echo htmlspecialchars($row['pos']); ?>
+                                        <td class="px-3 py-3">
+                                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                <?php echo htmlspecialchars($row['kode_perkiraan']); ?>
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-gray-900 font-semibold"><?php echo htmlspecialchars($row['kode_perkiraan']); ?></td>
-                                        <td class="px-4 py-3 text-gray-700"><?php echo htmlspecialchars($row['nama_akun']); ?></td>
-                                        <td class="px-4 py-3 text-gray-700">
-                                            <div class="max-w-xs truncate" title="<?php echo htmlspecialchars($row['keterangan']); ?>">
+                                        <td class="px-3 py-3 text-gray-700">
+                                            <div class="max-w-48 truncate text-sm" title="<?php echo htmlspecialchars($row['keterangan']); ?>">
                                                 <?php echo htmlspecialchars($row['keterangan']); ?>
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3 text-right">
-                                            <span class="font-bold text-red-600 text-lg">Rp <?php echo number_format($row['nominal_pengeluaran'], 0, ',', '.'); ?></span>
+                                        <td class="px-3 py-3 text-right">
+                                            <span class="font-bold text-red-600 text-sm">Rp <?php echo number_format($row['nominal'], 0, ',', '.'); ?></span>
                                         </td>
-                                        <td class="px-4 py-3 text-center">
-                                            <div class="flex justify-center">
-                                                <div class="relative group">
-                                                    <button class="inline-flex items-center px-3 py-2 rounded-lg text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors duration-200">
-                                                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                                                        </svg>
-                                                        Tersimpan
-                                                    </button>
-                                                    <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-20">
-                                                        Klik untuk melihat foto bukti
-                                                    </div>
-                                                </div>
-                                            </div>
+                                        <td class="px-3 py-3 text-center">
+                                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold <?php echo $status_bg; ?>"
+                                                  title="<?php echo htmlspecialchars($row['catatan_bendahara'] ?? ''); ?>">
+                                                <?php echo ucfirst(htmlspecialchars($row['status'])); ?>
+                                            </span>
                                         </td>
                                     </tr>
                                     <?php endwhile; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="7" class="px-4 py-16 text-center">
+                                        <td colspan="5" class="px-4 py-16 text-center">
                                             <div class="flex flex-col items-center justify-center py-8">
                                                 <div class="bg-gray-100 p-4 rounded-full mb-4">
                                                     <svg class="w-16 h-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -459,6 +392,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             </div>
         </main>
     </div>
+
+    <!-- Modal Detail Pengeluaran (Dihapus untuk sementara) -->
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -489,10 +424,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                 formData.set('nominal', nominalValue);
 
                 // Add required action parameter
-                formData.append('action', 'tambah_pengeluaran');
+                formData.append('action', 'ajukan_pengeluaran');
                 formData.append('bruder_id', <?php echo $id_bruder; ?>);
-                formData.append('tipe_transaksi', 'Pengeluaran');
-                formData.append('sumber_dana', 'Kas Harian');
 
                 // Show loading
                 submitBtn.disabled = true;
@@ -571,6 +504,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                     }
                 }
             });
+
+            // Modal functions (dihapus untuk sementara)
         });
     </script>
 </body>

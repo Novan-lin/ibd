@@ -8,7 +8,7 @@ session_start();
 
 // Cek apakah user sudah login. Jika belum, redirect ke halaman login.
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
-    header("Location: index.php");
+    header("Location: login.php");
     exit;
 }
 
@@ -38,7 +38,7 @@ $result_bruder = $conn->query($sql);
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     $_SESSION = array();
     session_destroy();
-    header("Location: index.php");
+    header("Location: login.php");
     exit;
 }
 ?>
@@ -77,14 +77,22 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             </div>
 
             <!-- Menu Navigasi -->
-            <nav class="flex-grow pt-4">
-                <a href="dashboard.php" class="sidebar-link flex items-center px-6 py-3 text-gray-600 hover:bg-gray-200 transition">
-                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+           <nav class="flex-grow pt-4 space-y-2">
+                <a href="dashboard.php" class="sidebar-link active flex items-center px-6 py-3 text-white bg-[#004488] transition">
+                    <svg class="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path></svg>
                     Dashboard
                 </a>
-                <a href="laporan.php" class="sidebar-link active flex items-center px-6 py-3 text-gray-600 hover:bg-gray-200 transition">
-                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <a href="laporan.php" class="flex items-center px-6 py-3 text-gray-300 hover:bg-[#004488] hover:text-white transition">
+                    <svg class="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path><path d="M12 2.252A8.014 8.014 0 0117.748 12H12V2.252z"></path></svg>
                     Laporan Keuangan
+                </a>
+                <a href="perjalanan_bruder.php" class="flex items-center px-6 py-3 text-gray-300 hover:bg-[#004488] hover:text-white transition">
+                    <svg class="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Perjalanan Bruder
+                </a>
+                <a href="bruder_management.php" class="flex items-center px-6 py-3 text-gray-300 hover:bg-[#004488] hover:text-white transition">
+                    <svg class="w-6 h-6 mr-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"></path></svg>
+                    Kelola Bruder
                 </a>
             </nav>
 

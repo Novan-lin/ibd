@@ -64,6 +64,24 @@ try {
         case 'get_transaction_details':
             $response = getTransactionDetails($conn);
             break;
+        case 'ajukan_pengeluaran':
+            $response = ajukanPengeluaran($conn);
+            break;
+        case 'approve_pengeluaran':
+            $response = approvePengeluaran($conn);
+            break;
+        case 'reject_pengeluaran':
+            $response = rejectPengeluaran($conn);
+            break;
+        case 'get_pending_approvals':
+            $response = getPendingApprovals($conn);
+            break;
+        case 'edit_bruder':
+            $response = editBruder($conn);
+            break;
+        case 'delete_bruder':
+            $response = deleteBruder($conn);
+            break;
         default:
             $response = ['success' => false, 'message' => 'Unknown action'];
     }
@@ -448,6 +466,293 @@ function getTransactionDetails($conn) {
         return ['success' => true, 'data' => $transaction];
     } else {
         return ['success' => false, 'message' => 'Transaction not found'];
+    }
+}
+
+// =====================================================================
+// AJUKAN PENGELUARAN (APPROVAL WORKFLOW)
+// =====================================================================
+function ajukanPengeluaran($conn) {
+    if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || $_SESSION['role'] !== 'bruder') {
+        return ['success' => false, 'message' => 'Akses ditolak. Hanya bruder yang bisa mengajukan.'];
+    }
+
+    $id_bruder = (int)($_POST['bruder_id'] ?? 0);
+    $id_perkiraan = (int)($_POST['id_perkiraan'] ?? 0);
+    $tanggal = $_POST['tanggal'] ?? ''; // Tanggal dari form, tapi kita akan pakai CURRENT_TIMESTAMP
+    $keterangan = $_POST['keterangan'] ?? '';
+    $nominal = (float)str_replace(['.', ','], ['', '.'], $_POST['nominal']);
+    $id_cabang = $_SESSION['id_cabang'] ?? 0;
+
+    if ($id_bruder <= 0 || $id_perkiraan <= 0 || empty($keterangan) || $nominal <= 0 || $id_cabang <= 0) {
+        return ['success' => false, 'message' => 'Data tidak lengkap. Semua field wajib diisi.'];
+    }
+
+    // Handle file upload
+    $foto_bukti_filename = null;
+    if (isset($_FILES['foto_bukti']) && $_FILES['foto_bukti']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = 'uploads/bruder_photos/';
+        if (!file_exists($upload_dir)) {
+            if (!mkdir($upload_dir, 0777, true)) {
+                return ['success' => false, 'message' => 'Gagal membuat direktori upload.'];
+            }
+        }
+
+        $file_extension = strtolower(pathinfo($_FILES['foto_bukti']['name'], PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+        if (!in_array($file_extension, $allowed_extensions)) {
+            return ['success' => false, 'message' => 'Format file foto tidak didukung. Gunakan JPG, PNG, atau GIF.'];
+        }
+
+        if ($_FILES['foto_bukti']['size'] > 5 * 1024 * 1024) { // 5MB max
+            return ['success' => false, 'message' => 'Ukuran file foto terlalu besar. Maksimal 5MB.'];
+        }
+
+        $foto_bukti_filename = uniqid('bukti_', true) . '.' . $file_extension;
+        $upload_path = $upload_dir . $foto_bukti_filename;
+
+        if (!move_uploaded_file($_FILES['foto_bukti']['tmp_name'], $upload_path)) {
+            return ['success' => false, 'message' => 'Gagal mengupload foto bukti.'];
+        }
+    }
+
+    // Insert into the new approval table
+    $stmt = $conn->prepare(
+        "INSERT INTO pengajuan_pengeluaran (id_bruder, id_perkiraan, id_cabang, keterangan, nominal, foto_bukti)
+         VALUES (?, ?, ?, ?, ?, ?)"
+    );
+    $stmt->bind_param("iiisds", $id_bruder, $id_perkiraan, $id_cabang, $keterangan, $nominal, $foto_bukti_filename);
+
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Pengajuan pengeluaran berhasil dikirim dan menunggu persetujuan.'];
+    } else {
+        // Jika gagal, hapus file yang sudah terupload
+        if ($foto_bukti_filename && file_exists($upload_path)) {
+            unlink($upload_path);
+        }
+        return ['success' => false, 'message' => 'Gagal menyimpan pengajuan: ' . $conn->error];
+    }
+}
+
+// =====================================================================
+// APPROVE PENGAJUAN PENGELUARAN
+// =====================================================================
+function approvePengeluaran($conn) {
+    if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || ($_SESSION['role'] !== 'admin_cabang' && $_SESSION['level'] !== 'bendahara')) {
+        return ['success' => false, 'message' => 'Akses ditolak. Hanya bendahara atau admin cabang yang bisa menyetujui.'];
+    }
+
+    $id_pengajuan = (int)($_POST['id_pengajuan'] ?? 0);
+    $diperiksa_oleh = $_SESSION['id'] ?? null; // ID user yang menyetujui (bendahara/admin)
+
+    if ($id_pengajuan <= 0) {
+        return ['success' => false, 'message' => 'ID Pengajuan tidak valid.'];
+    }
+
+    // Start transaction
+    $conn->begin_transaction();
+
+    try {
+        // 1. Get details from pengajuan_pengeluaran
+        $stmt_get = $conn->prepare(
+            "SELECT id_bruder, id_perkiraan, id_cabang, tanggal_pengajuan, keterangan, nominal
+             FROM pengajuan_pengeluaran
+             WHERE id_pengajuan = ? AND status = 'pending'"
+        );
+        $stmt_get->bind_param("i", $id_pengajuan);
+        $stmt_get->execute();
+        $result_get = $stmt_get->get_result();
+
+        if ($result_get->num_rows === 0) {
+            throw new Exception("Pengajuan tidak ditemukan atau sudah tidak pending.");
+        }
+        $pengajuan_data = $result_get->fetch_assoc();
+        $stmt_get->close();
+
+        // 2. Insert into transaksi table using stored procedure
+        $bruder_id = $pengajuan_data['id_bruder'];
+        $id_perkiraan = $pengajuan_data['id_perkiraan'];
+        $tanggal_transaksi = $pengajuan_data['tanggal_pengajuan'];
+        $keterangan = $pengajuan_data['keterangan'];
+        $nominal = $pengajuan_data['nominal'];
+        $id_cabang = $pengajuan_data['id_cabang'];
+
+        $stmt_proc = $conn->prepare("CALL catat_transaksi_keuangan_multi_cabang(?, ?, ?, ?, 'Kas Harian', 'Pengeluaran', ?, ?)");
+        $stmt_proc->bind_param("iissdi", $bruder_id, $id_perkiraan, $tanggal_transaksi, $keterangan, $nominal, $id_cabang);
+        if (!$stmt_proc->execute()) {
+            throw new Exception("Gagal mencatat transaksi final: " . $stmt_proc->error);
+        }
+        $stmt_proc->close();
+
+        // 3. Update status in pengajuan_pengeluaran
+        $stmt_update = $conn->prepare(
+            "UPDATE pengajuan_pengeluaran
+             SET status = 'disetujui', tanggal_aksi = NOW(), diperiksa_oleh = ?
+             WHERE id_pengajuan = ?"
+        );
+        $stmt_update->bind_param("ii", $diperiksa_oleh, $id_pengajuan);
+        if (!$stmt_update->execute()) {
+            throw new Exception("Gagal memperbarui status pengajuan: " . $stmt_update->error);
+        }
+        $stmt_update->close();
+
+        $conn->commit();
+        return ['success' => true, 'message' => 'Pengajuan berhasil disetujui dan transaksi dicatat!'];
+
+    } catch (Exception $e) {
+        $conn->rollback();
+        return ['success' => false, 'message' => 'Gagal menyetujui pengajuan: ' . $e->getMessage()];
+    }
+}
+
+// =====================================================================
+// REJECT PENGAJUAN PENGELUARAN
+// =====================================================================
+function rejectPengeluaran($conn) {
+    if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || ($_SESSION['role'] !== 'admin_cabang' && $_SESSION['level'] !== 'bendahara')) {
+        return ['success' => false, 'message' => 'Akses ditolak. Hanya bendahara atau admin cabang yang bisa menolak.'];
+    }
+
+    $id_pengajuan = (int)($_POST['id_pengajuan'] ?? 0);
+    $catatan_bendahara = $_POST['catatan_bendahara'] ?? '';
+    $diperiksa_oleh = $_SESSION['id'] ?? null; // ID user yang menolak (bendahara/admin)
+
+    if ($id_pengajuan <= 0) {
+        return ['success' => false, 'message' => 'ID Pengajuan tidak valid.'];
+    }
+
+    $stmt = $conn->prepare(
+        "UPDATE pengajuan_pengeluaran
+         SET status = 'ditolak', tanggal_aksi = NOW(), catatan_bendahara = ?, diperiksa_oleh = ?
+         WHERE id_pengajuan = ? AND status = 'pending'"
+    );
+    $stmt->bind_param("sii", $catatan_bendahara, $diperiksa_oleh, $id_pengajuan);
+
+    if ($stmt->execute()) {
+        if ($stmt->affected_rows > 0) {
+            return ['success' => true, 'message' => 'Pengajuan berhasil ditolak.'];
+        } else {
+            return ['success' => false, 'message' => 'Pengajuan tidak ditemukan atau sudah tidak pending.'];
+        }
+    } else {
+        return ['success' => false, 'message' => 'Gagal menolak pengajuan: ' . $conn->error];
+    }
+}
+
+// =====================================================================
+// GET PENDING APPROVALS FOR BENDAHARA
+// =====================================================================
+function getPendingApprovals($conn) {
+    if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['id_cabang'])) {
+        return ['success' => false, 'message' => 'Unauthorized access'];
+    }
+
+    $id_cabang = (int)($_GET['id_cabang'] ?? 0);
+
+    if ($id_cabang <= 0) {
+        return ['success' => false, 'message' => 'ID Cabang tidak valid.'];
+    }
+
+    $stmt = $conn->prepare(
+        "SELECT p.id_pengajuan, p.tanggal_pengajuan, b.nama_bruder, kp.nama_akun, p.keterangan, p.nominal, p.foto_bukti
+         FROM pengajuan_pengeluaran p
+         JOIN bruder b ON p.id_bruder = b.id_bruder
+         JOIN kode_perkiraan kp ON p.id_perkiraan = kp.id_perkiraan
+         WHERE p.id_cabang = ? AND p.status = 'pending'
+         ORDER BY p.tanggal_pengajuan ASC"
+    );
+    $stmt->bind_param("i", $id_cabang);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $approvals = [];
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $approvals[] = $row;
+        }
+    }
+
+    return ['success' => true, 'data' => $approvals];
+}
+
+// =====================================================================
+// EDIT BRUDER
+// =====================================================================
+function editBruder($conn) {
+    if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+        return ['success' => false, 'message' => 'Unauthorized access'];
+    }
+
+    $id_bruder = (int)($_POST['id_bruder'] ?? 0);
+    $nama_bruder_baru = $_POST['nama_bruder'] ?? '';
+    $id_komunitas = (int)($_POST['id_komunitas'] ?? 0);
+    $ttl_baru = $_POST['ttl_bruder'] ?? '';
+    $alamat_baru = $_POST['alamat_bruder'] ?? '';
+
+    if ($id_bruder <= 0 || empty($nama_bruder_baru)) {
+        return ['success' => false, 'message' => 'ID Bruder dan nama harus diisi!'];
+    }
+
+    // Gunakan stored procedure yang sudah ada
+    $stmt = $conn->prepare("CALL update_data_bruder(?, ?, ?, ?)");
+    $stmt->bind_param("isss", $id_bruder, $nama_bruder_baru, $alamat_baru, $ttl_baru);
+
+    if ($stmt->execute()) {
+        return ['success' => true, 'message' => 'Data bruder berhasil diupdate!'];
+    } else {
+        return ['success' => false, 'message' => 'Gagal mengupdate data bruder: ' . $conn->error];
+    }
+}
+
+// =====================================================================
+// DELETE BRUDER
+// =====================================================================
+function deleteBruder($conn) {
+    if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+        return ['success' => false, 'message' => 'Unauthorized access'];
+    }
+
+    $id_bruder = (int)($_POST['id_bruder'] ?? 0);
+
+    if ($id_bruder <= 0) {
+        return ['success' => false, 'message' => 'ID Bruder tidak valid!'];
+    }
+
+    // Cek apakah bruder memiliki transaksi
+    $stmt_check = $conn->prepare("SELECT COUNT(*) as total_transaksi FROM transaksi WHERE id_bruder = ?");
+    $stmt_check->bind_param("i", $id_bruder);
+    $stmt_check->execute();
+    $result_check = $stmt_check->get_result();
+    $transaksi_count = $result_check->fetch_assoc()['total_transaksi'];
+
+    if ($transaksi_count > 0) {
+        return ['success' => false, 'message' => 'Tidak dapat menghapus bruder yang memiliki riwayat transaksi!'];
+    }
+
+    // Cek apakah bruder memiliki pengajuan yang pending
+    $stmt_check2 = $conn->prepare("SELECT COUNT(*) as total_pengajuan FROM pengajuan_pengeluaran WHERE id_bruder = ? AND status = 'pending'");
+    $stmt_check2->bind_param("i", $id_bruder);
+    $stmt_check2->execute();
+    $result_check2 = $stmt_check2->get_result();
+    $pengajuan_count = $result_check2->fetch_assoc()['total_pengajuan'];
+
+    if ($pengajuan_count > 0) {
+        return ['success' => false, 'message' => 'Tidak dapat menghapus bruder yang memiliki pengajuan pending!'];
+    }
+
+    // Delete bruder
+    $stmt = $conn->prepare("DELETE FROM bruder WHERE id_bruder = ?");
+    $stmt->bind_param("i", $id_bruder);
+
+    if ($stmt->execute()) {
+        if ($stmt->affected_rows > 0) {
+            return ['success' => true, 'message' => 'Bruder berhasil dihapus!'];
+        } else {
+            return ['success' => false, 'message' => 'Bruder tidak ditemukan!'];
+        }
+    } else {
+        return ['success' => false, 'message' => 'Gagal menghapus bruder: ' . $conn->error];
     }
 }
 ?>
