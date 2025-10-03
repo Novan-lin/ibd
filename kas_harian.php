@@ -34,6 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tambah_transaksi_kas'
         $nominal = (float)$_POST['nominal'];
         $reff = $_POST['reff'] ?? null;
 
+        
+
         // Memanggil Stored Procedure `catat_transaksi_keuangan`
         // Ini adalah cara yang lebih aman dan terstruktur
         $stmt_proc = $conn->prepare("CALL catat_transaksi_keuangan(?, ?, ?, ?, 'Kas Harian', ?, ?)");
@@ -64,7 +66,7 @@ if ($bruder_id > 0) {
 
     // Ambil Data Transaksi Kas Harian untuk ditampilkan
     $stmt_trans = $conn->prepare(
-        "SELECT t.tanggal_transaksi, kp.pos, kp.kode_perkiraan, kp.nama_akun, t.keterangan, t.reff, t.nominal_penerimaan, t.nominal_pengeluaran
+        "SELECT t.tanggal_transaksi,kp.id_perkiraan,kp.tipe_akun,t.id_transaksi,kp.kode_perkiraan, kp.pos, kp.kode_perkiraan, kp.nama_akun, t.keterangan, t.reff, t.nominal_penerimaan, t.nominal_pengeluaran
          FROM transaksi t
          JOIN kode_perkiraan kp ON t.id_perkiraan = kp.id_perkiraan
          WHERE t.id_bruder = ? AND t.sumber_dana = 'Kas Harian'
@@ -331,8 +333,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if ($transactions && $transactions->num_rows > 0): ?>
+                            <?php if ($transactions && $transactions->num_rows > 0): 
+                                 ?>
                                 <?php while($row = $transactions->fetch_assoc()): ?>
+                                    
                                 <tr>
                                     <td><?php echo htmlspecialchars(date('d-m-Y', strtotime($row['tanggal_transaksi']))); ?></td>
                                     <td><?php echo htmlspecialchars($row['pos']); ?></td>
@@ -342,6 +346,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                                     <td><?php echo htmlspecialchars($row['reff']); ?></td>
                                     <td class="text-right"><?php echo "Rp " . number_format($row['nominal_penerimaan'], 0, ',', '.'); ?></td>
                                     <td class="text-right"><?php echo "Rp " . number_format($row['nominal_pengeluaran'], 0, ',', '.'); ?></td>
+                                      <td class="text-center">
+                                    <div class="flex space-x-2 justify-center">
+                                        <button class="edit-btn bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600"
+                                                data-transaction-id="<?=$row['id_transaksi']?>"
+                                                data-tanggal="<?=$row['tanggal_transaksi']?>"
+                                                data-perkiraan="<?=$row['kode_perkiraan']?>"
+                                                data-tipe="<?=$row['tipe_akun']?>"
+                                                data-nominal="<?= strtolower($row['tipe_akun']) === 'penerimaan' ?floatval($row['nominal_penerimaan']): floatval($row['nominal_pengeluaran']) ?>"
+                                                data-keterangan="<?=$row['keterangan']?>">
+                                            Edit
+                                        </button>
+                                        <button class="delete-btn bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600"
+                                                data-transaction-id="<?=$row['id_transaksi']?>">
+                                            Hapus
+                                        </button>
+                                    </div>
+                                </td>
                                 </tr>
                                 <?php endwhile; ?>
                             <?php else: ?>
@@ -511,6 +532,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                 .then(data => {
                     if (data.success) {
                         updateTransactionTable(data.data);
+                        // alert('success');
                     } else {
                         console.error('Failed to load transactions:', data.message);
                     }
@@ -625,7 +647,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
             // Function to show edit modal
             function showEditModal(transactionData) {
-                currentEditTransactionId = transactionData.transactionId;
+                currentEditTransactionId = transactionData.transactionId;    
 
                 document.getElementById('editTransactionId').value = transactionData.transactionId;
                 document.getElementById('editTanggal').value = transactionData.tanggal;
